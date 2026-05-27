@@ -1,4 +1,7 @@
-from typing import TypedDict
+import logging
+import time
+from functools import wraps
+from typing import Callable, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
@@ -12,6 +15,13 @@ from models import (
 )
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("workflow_audit_agent")
+
+
 class WorkflowAuditState(TypedDict, total=False):
     raw_input: str
     workflow_steps: list[WorkflowStep]
@@ -22,6 +32,23 @@ class WorkflowAuditState(TypedDict, total=False):
     final_report: FinalAuditReport
 
 
+def log_node_execution(node_name: str) -> Callable:
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(state: WorkflowAuditState) -> WorkflowAuditState:
+            start_time = time.perf_counter()
+            logger.info("Node started: %s", node_name)
+            result = func(state)
+            duration = time.perf_counter() - start_time
+            logger.info("Node finished: %s (%.3fs)", node_name, duration)
+            return result
+
+        return wrapper
+
+    return decorator
+
+
+@log_node_execution("extract_workflow")
 def extract_workflow(state: WorkflowAuditState) -> WorkflowAuditState:
     raw_input = state.get("raw_input", "")
     lines = [line.strip("- ").strip() for line in raw_input.splitlines() if line.strip()]
@@ -57,6 +84,7 @@ def extract_workflow(state: WorkflowAuditState) -> WorkflowAuditState:
     return {"workflow_steps": workflow_steps}
 
 
+@log_node_execution("analyze_pain_points")
 def analyze_pain_points(state: WorkflowAuditState) -> WorkflowAuditState:
     pain_points: list[PainPoint] = []
 
@@ -78,6 +106,7 @@ def analyze_pain_points(state: WorkflowAuditState) -> WorkflowAuditState:
     return {"pain_points": pain_points}
 
 
+@log_node_execution("identify_automation_opportunities")
 def identify_automation_opportunities(state: WorkflowAuditState) -> WorkflowAuditState:
     opportunities: list[AutomationOpportunity] = []
 
@@ -99,6 +128,7 @@ def identify_automation_opportunities(state: WorkflowAuditState) -> WorkflowAudi
     return {"automation_opportunities": opportunities}
 
 
+@log_node_execution("estimate_roi")
 def estimate_roi(state: WorkflowAuditState) -> WorkflowAuditState:
     opportunities = state.get("automation_opportunities", [])
     total_hours_saved = sum(item.estimated_time_saved_hours_per_month for item in opportunities)
@@ -126,6 +156,7 @@ def estimate_roi(state: WorkflowAuditState) -> WorkflowAuditState:
     return {"roi_estimate": roi_estimate}
 
 
+@log_node_execution("analyze_risks")
 def analyze_risks(state: WorkflowAuditState) -> WorkflowAuditState:
     risks: list[RiskAssessment] = []
 
@@ -148,6 +179,7 @@ def analyze_risks(state: WorkflowAuditState) -> WorkflowAuditState:
     return {"risks": risks}
 
 
+@log_node_execution("generate_report")
 def generate_report(state: WorkflowAuditState) -> WorkflowAuditState:
     workflow_steps = state.get("workflow_steps", [])
     pain_points = state.get("pain_points", [])
@@ -200,3 +232,15 @@ def build_workflow():
     graph_builder.add_edge("analyze_risks", "generate_report")
     graph_builder.add_edge("generate_report", END)
     return graph_builder.compile()
+
+
+def run_workflow_audit(state: WorkflowAuditState) -> WorkflowAuditState:
+    start_time = time.perf_counter()
+    logger.info("Audit started")
+    workflow = build_workflow()
+    result = workflow.invoke(state)
+    duration = time.perf_counter() - start_time
+    report_generated = bool(result.get("final_report"))
+    logger.info("Final report generated successfully: %s", report_generated)
+    logger.info("Audit finished in %.3fs", duration)
+    return result

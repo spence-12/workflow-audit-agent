@@ -1,16 +1,11 @@
 import streamlit as st
 
-from graph import WorkflowAuditState, build_workflow
+from graph import WorkflowAuditState, run_workflow_audit
 from models import FinalAuditReport
 from sample_inputs import SAMPLE_WORKFLOWS, SAMPLE_WORKFLOW_INPUT
 
 
 DEFAULT_WORKFLOW_TEXT = SAMPLE_WORKFLOW_INPUT["raw_input"]
-
-
-@st.cache_resource
-def get_workflow_graph():
-    return build_workflow()
 
 
 def build_markdown_report(report: FinalAuditReport) -> str:
@@ -178,8 +173,7 @@ def render_roadmap(report: FinalAuditReport) -> None:
 
 
 def run_audit(raw_input: str) -> WorkflowAuditState:
-    graph = get_workflow_graph()
-    return graph.invoke({"raw_input": raw_input})
+    return run_workflow_audit({"raw_input": raw_input})
 
 
 def main() -> None:

@@ -1,4 +1,4 @@
-from graph import build_workflow
+from graph import run_workflow_audit
 from models import FinalAuditReport
 from sample_inputs import SAMPLE_WORKFLOW_INPUT
 
@@ -105,8 +105,7 @@ def format_final_report_markdown(report: FinalAuditReport) -> str:
 
 
 def main() -> None:
-    workflow = build_workflow()
-    result = workflow.invoke(SAMPLE_WORKFLOW_INPUT)
+    result = run_workflow_audit(SAMPLE_WORKFLOW_INPUT)
     final_report = result["final_report"]
     print(format_final_report_markdown(final_report))
 
